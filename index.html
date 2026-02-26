@@ -3,16 +3,44 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Game Pesawat Tempur</title>
+    <title>Space Shooter Neon Edition</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #000; font-family: sans-serif; }
-        canvas { display: block; background: linear-gradient(to bottom, #000428, #004e92); }
-        #ui { position: absolute; top: 10px; left: 10px; color: white; font-size: 20px; pointer-events: none; }
+        body { 
+            margin: 0; 
+            overflow: hidden; 
+            background: #050505; 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        canvas { display: block; }
+        
+        /* UI Overlay yang lebih modern */
+        #ui {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: #00d4ff;
+            font-size: 24px;
+            font-weight: bold;
+            text-shadow: 0 0 10px #00d4ff;
+            pointer-events: none;
+            letter-spacing: 2px;
+        }
+        
+        /* Efek Scanline biar kayak TV jadul */
+        body::after {
+            content: "";
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), 
+                        linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            background-size: 100% 4px, 3px 100%;
+            pointer-events: none;
+        }
     </style>
 </head>
 <body>
 
-<div id="ui">Skor: <span id="score">0</span></div>
+<div id="ui">SCORE: <span id="score">0</span></div>
 <canvas id="gameCanvas"></canvas>
 
 <script>
@@ -26,62 +54,109 @@ canvas.height = window.innerHeight;
 let score = 0;
 let gameActive = true;
 
-// Data Pesawat Pemain
-const player = {
-    x: canvas.width / 2,
-    y: canvas.height - 100,
-    w: 50,
-    h: 50,
-    color: "#00d4ff"
-};
+// Kontrol Mouse/Touch
+let mouseX = canvas.width / 2;
+let mouseY = canvas.height - 100;
+
+window.addEventListener("pointermove", (e) => {
+    mouseX = e.clientX;
+    mouseY = e.clientY;
+});
+
+// Bintang untuk latar belakang (Parallax)
+const stars = [];
+for(let i = 0; i < 100; i++) {
+    stars.push({
+        x: Math.random() * canvas.width,
+        y: Math.random() * canvas.height,
+        size: Math.random() * 2,
+        speed: Math.random() * 3 + 1
+    });
+}
 
 const bullets = [];
 const enemies = [];
+const particles = [];
 
-// Fungsi buat musuh
+// Class Partikel Ledakan
+class Particle {
+    constructor(x, y, color) {
+        this.x = x;
+        this.y = y;
+        this.size = Math.random() * 3 + 1;
+        this.speedX = Math.random() * 6 - 3;
+        this.speedY = Math.random() * 6 - 3;
+        this.color = color;
+        this.alpha = 1;
+    }
+    update() {
+        this.x += this.speedX;
+        this.y += this.speedY;
+        this.alpha -= 0.02;
+    }
+    draw() {
+        ctx.save();
+        ctx.globalAlpha = this.alpha;
+        ctx.fillStyle = this.color;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+    }
+}
+
 function spawnEnemy() {
     if (!gameActive) return;
-    const size = 40;
+    const size = 30 + Math.random() * 20;
     enemies.push({
         x: Math.random() * (canvas.width - size),
         y: -size,
         w: size,
         h: size,
-        speed: 2 + Math.random() * 3,
-        color: "#ff4b2b"
+        speed: 2 + (score / 100), // Semakin tinggi skor, semakin cepat
+        color: `hsl(${Math.random() * 360}, 70%, 50%)`
     });
 }
-setInterval(spawnEnemy, 1000);
+setInterval(spawnEnemy, 800);
 
-// Kontrol Mouse/Touch
-window.addEventListener("mousemove", (e) => {
-    player.x = e.clientX - player.w / 2;
-    player.y = e.clientY - player.h / 2;
-});
-
-// Menembak otomatis
+// Auto-Shoot
 setInterval(() => {
     if (gameActive) {
-        bullets.push({ x: player.x + player.w / 2 - 2, y: player.y, w: 4, h: 10 });
+        bullets.push({ x: mouseX - 2, y: mouseY - 20, w: 4, h: 15 });
     }
-}, 200);
+}, 150);
 
 function update() {
     if (!gameActive) return;
 
-    // Update Peluru
+    // Bintang
+    stars.forEach(s => {
+        s.y += s.speed;
+        if (s.y > canvas.height) s.y = 0;
+    });
+
+    // Peluru
     bullets.forEach((b, i) => {
-        b.y -= 7;
+        b.y -= 10;
         if (b.y < 0) bullets.splice(i, 1);
     });
 
-    // Update Musuh
+    // Partikel
+    particles.forEach((p, i) => {
+        p.update();
+        if (p.alpha <= 0) particles.splice(i, 1);
+    });
+
+    // Musuh
     enemies.forEach((en, i) => {
         en.y += en.speed;
         
-        // Cek tabrakan dengan peluru
+        // Tabrakan Peluru x Musuh
         bullets.forEach((b, bi) => {
             if (b.x < en.x + en.w && b.x + b.w > en.x && b.y < en.y + en.h && b.y + b.h > en.y) {
+                // Buat Ledakan
+                for(let p=0; p<10; p++) particles.push(new Particle(en.x + en.w/2, en.y + en.h/2, en.color));
+                
                 enemies.splice(i, 1);
                 bullets.splice(bi, 1);
                 score += 10;
@@ -89,11 +164,16 @@ function update() {
             }
         });
 
-        // Cek tabrakan dengan pemain
-        if (player.x < en.x + en.w && player.x + player.w > en.x && player.y < en.y + en.h && player.y + player.h > en.y) {
+        // Tabrakan Pemain x Musuh
+        let dx = mouseX - (en.x + en.w/2);
+        let dy = mouseY - (en.y + en.h/2);
+        let distance = Math.sqrt(dx*dx + dy*dy);
+        if (distance < 30) {
             gameActive = false;
-            alert("GAME OVER! Skor Akhir: " + score);
-            location.reload();
+            setTimeout(() => {
+                alert("MISSION FAILED! Score: " + score);
+                location.reload();
+            }, 100);
         }
 
         if (en.y > canvas.height) enemies.splice(i, 1);
@@ -101,25 +181,45 @@ function update() {
 }
 
 function draw() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    // Background Gelap
+    ctx.fillStyle = "#050505";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Gambar Pesawat (Bentuk Segitiga Sederhana)
-    ctx.fillStyle = player.color;
-    ctx.beginPath();
-    ctx.moveTo(player.x + player.w / 2, player.y);
-    ctx.lineTo(player.x, player.y + player.h);
-    ctx.lineTo(player.x + player.w, player.y + player.h);
-    ctx.fill();
+    // Gambar Bintang
+    ctx.fillStyle = "white";
+    stars.forEach(s => ctx.fillRect(s.x, s.y, s.size, s.size));
 
-    // Gambar Peluru
-    ctx.fillStyle = "yellow";
+    // Gambar Peluru (Neon Glow)
+    ctx.shadowBlur = 15;
+    ctx.shadowColor = "#fff";
+    ctx.fillStyle = "#fff";
     bullets.forEach(b => ctx.fillRect(b.x, b.y, b.w, b.h));
 
-    // Gambar Musuh
-    ctx.fillStyle = "red";
+    // Gambar Partikel
+    particles.forEach(p => p.draw());
+
+    // Gambar Musuh (Neon Box)
     enemies.forEach(en => {
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = en.color;
+        ctx.strokeStyle = en.color;
+        ctx.lineWidth = 2;
+        ctx.strokeRect(en.x, en.y, en.w, en.h);
+        ctx.fillStyle = "rgba(255,255,255,0.1)";
         ctx.fillRect(en.x, en.y, en.w, en.h);
     });
+
+    // Gambar Pesawat Pemain (Glow Biru)
+    ctx.shadowBlur = 20;
+    ctx.shadowColor = "#00d4ff";
+    ctx.fillStyle = "#00d4ff";
+    ctx.beginPath();
+    ctx.moveTo(mouseX, mouseY - 25);
+    ctx.lineTo(mouseX - 20, mouseY + 15);
+    ctx.lineTo(mouseX + 20, mouseY + 15);
+    ctx.fill();
+    
+    ctx.shadowBlur = 0; // Reset glow untuk performa
 
     update();
     requestAnimationFrame(draw);
