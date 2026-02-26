@@ -3,160 +3,124 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Space Shooter Neon Edition</title>
+    <title>Neon Striker Pro</title>
     <style>
-        body { 
-            margin: 0; 
-            overflow: hidden; 
-            background: #050505; 
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
+        body { margin: 0; overflow: hidden; background: #020205; font-family: 'Orbitron', sans-serif; }
         canvas { display: block; }
-        
-        /* UI Overlay yang lebih modern */
         #ui {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            color: #00d4ff;
-            font-size: 24px;
-            font-weight: bold;
-            text-shadow: 0 0 10px #00d4ff;
-            pointer-events: none;
-            letter-spacing: 2px;
+            position: absolute; top: 20px; left: 20px; color: #00f2ff;
+            font-size: 20px; text-shadow: 0 0 10px #00f2ff; pointer-events: none;
         }
-        
-        /* Efek Scanline biar kayak TV jadul */
-        body::after {
-            content: "";
-            position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), 
-                        linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
-            background-size: 100% 4px, 3px 100%;
-            pointer-events: none;
-        }
+        #power-label { color: #00ff88; font-size: 14px; margin-top: 5px; display: none; }
     </style>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
 </head>
 <body>
 
-<div id="ui">SCORE: <span id="score">0</span></div>
+<div id="ui">
+    SCORE: <span id="score">0</span>
+    <div id="power-label">POWER UP ACTIVE!</div>
+</div>
 <canvas id="gameCanvas"></canvas>
 
 <script>
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
 const scoreElement = document.getElementById("score");
+const powerLabel = document.getElementById("power-label");
 
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
 let score = 0;
 let gameActive = true;
+let powerLevel = 1; // Level peluru (1 sampai 3)
+let powerTimer = 0;
+let shake = 0;
 
-// Kontrol Mouse/Touch
-let mouseX = canvas.width / 2;
-let mouseY = canvas.height - 100;
+// Posisi Target (Mouse) & Posisi Real (Pesawat)
+let targetX = canvas.width / 2;
+let targetY = canvas.height - 100;
+let playerX = targetX;
+let playerY = targetY;
 
 window.addEventListener("pointermove", (e) => {
-    mouseX = e.clientX;
-    mouseY = e.clientY;
+    targetX = e.clientX;
+    targetY = e.clientY;
 });
-
-// Bintang untuk latar belakang (Parallax)
-const stars = [];
-for(let i = 0; i < 100; i++) {
-    stars.push({
-        x: Math.random() * canvas.width,
-        y: Math.random() * canvas.height,
-        size: Math.random() * 2,
-        speed: Math.random() * 3 + 1
-    });
-}
 
 const bullets = [];
 const enemies = [];
 const particles = [];
+const powerUps = [];
 
-// Class Partikel Ledakan
-class Particle {
-    constructor(x, y, color) {
-        this.x = x;
-        this.y = y;
-        this.size = Math.random() * 3 + 1;
-        this.speedX = Math.random() * 6 - 3;
-        this.speedY = Math.random() * 6 - 3;
-        this.color = color;
-        this.alpha = 1;
+class PowerUp {
+    constructor(x, y) {
+        this.x = x; this.y = y; this.size = 15;
     }
-    update() {
-        this.x += this.speedX;
-        this.y += this.speedY;
-        this.alpha -= 0.02;
-    }
+    update() { this.y += 2; }
     draw() {
-        ctx.save();
-        ctx.globalAlpha = this.alpha;
-        ctx.fillStyle = this.color;
-        ctx.beginPath();
-        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
+        ctx.shadowBlur = 15; ctx.shadowColor = "#00ff88";
+        ctx.fillStyle = "#00ff88";
+        ctx.beginPath(); ctx.arc(this.x, this.y, this.size, 0, Math.PI*2); ctx.fill();
     }
 }
 
 function spawnEnemy() {
     if (!gameActive) return;
-    const size = 30 + Math.random() * 20;
     enemies.push({
-        x: Math.random() * (canvas.width - size),
-        y: -size,
-        w: size,
-        h: size,
-        speed: 2 + (score / 100), // Semakin tinggi skor, semakin cepat
-        color: `hsl(${Math.random() * 360}, 70%, 50%)`
+        x: Math.random() * (canvas.width - 40),
+        y: -50, w: 40, h: 40,
+        speed: 3 + (score / 200),
+        color: `hsl(${Math.random() * 60 + 300}, 100%, 50%)`
     });
 }
-setInterval(spawnEnemy, 800);
+setInterval(spawnEnemy, 700);
 
-// Auto-Shoot
+// Sistem Tembak Berdasarkan Power Level
 setInterval(() => {
-    if (gameActive) {
-        bullets.push({ x: mouseX - 2, y: mouseY - 20, w: 4, h: 15 });
+    if (!gameActive) return;
+    if (powerLevel === 1) {
+        bullets.push({ x: playerX - 2, y: playerY - 20, vx: 0, vy: -12 });
+    } else if (powerLevel === 2) {
+        bullets.push({ x: playerX - 10, y: playerY - 20, vx: 0, vy: -12 });
+        bullets.push({ x: playerX + 10, y: playerY - 20, vx: 0, vy: -12 });
+    } else {
+        bullets.push({ x: playerX, y: playerY - 20, vx: 0, vy: -12 });
+        bullets.push({ x: playerX - 5, y: playerY - 20, vx: -2, vy: -12 });
+        bullets.push({ x: playerX + 5, y: playerY - 20, vx: 2, vy: -12 });
     }
-}, 150);
+}, 120);
 
 function update() {
     if (!gameActive) return;
 
-    // Bintang
-    stars.forEach(s => {
-        s.y += s.speed;
-        if (s.y > canvas.height) s.y = 0;
-    });
+    // Smooth Follow (Interpolasi)
+    playerX += (targetX - playerX) * 0.15;
+    playerY += (targetY - playerY) * 0.15;
 
-    // Peluru
+    // Power Timer logic
+    if (powerTimer > 0) {
+        powerTimer--;
+        powerLabel.style.display = "block";
+    } else {
+        powerLevel = 1;
+        powerLabel.style.display = "none";
+    }
+
     bullets.forEach((b, i) => {
-        b.y -= 10;
+        b.x += b.vx; b.y += b.vy;
         if (b.y < 0) bullets.splice(i, 1);
     });
 
-    // Partikel
-    particles.forEach((p, i) => {
-        p.update();
-        if (p.alpha <= 0) particles.splice(i, 1);
-    });
-
-    // Musuh
     enemies.forEach((en, i) => {
         en.y += en.speed;
         
-        // Tabrakan Peluru x Musuh
+        // Tabrakan Peluru
         bullets.forEach((b, bi) => {
-            if (b.x < en.x + en.w && b.x + b.w > en.x && b.y < en.y + en.h && b.y + b.h > en.y) {
-                // Buat Ledakan
-                for(let p=0; p<10; p++) particles.push(new Particle(en.x + en.w/2, en.y + en.h/2, en.color));
-                
+            if (b.x > en.x && b.x < en.x + en.w && b.y > en.y && b.y < en.y + en.h) {
+                shake = 5;
+                if (Math.random() > 0.9) powerUps.push(new PowerUp(en.x, en.y));
                 enemies.splice(i, 1);
                 bullets.splice(bi, 1);
                 score += 10;
@@ -164,67 +128,73 @@ function update() {
             }
         });
 
-        // Tabrakan Pemain x Musuh
-        let dx = mouseX - (en.x + en.w/2);
-        let dy = mouseY - (en.y + en.h/2);
-        let distance = Math.sqrt(dx*dx + dy*dy);
-        if (distance < 30) {
-            gameActive = false;
-            setTimeout(() => {
-                alert("MISSION FAILED! Score: " + score);
-                location.reload();
-            }, 100);
-        }
-
         if (en.y > canvas.height) enemies.splice(i, 1);
+        
+        // Cek Mati
+        let dist = Math.hypot(playerX - (en.x + en.w/2), playerY - (en.y + en.h/2));
+        if (dist < 25) gameActive = false;
     });
+
+    powerUps.forEach((p, i) => {
+        p.update();
+        let dist = Math.hypot(playerX - p.x, playerY - p.y);
+        if (dist < 30) {
+            powerLevel = 3;
+            powerTimer = 500; // Aktif selama ~8 detik
+            powerUps.splice(i, 1);
+        }
+    });
+
+    if (shake > 0) shake *= 0.9;
 }
 
 function draw() {
-    // Background Gelap
-    ctx.fillStyle = "#050505";
+    ctx.save();
+    // Efek Screen Shake
+    ctx.translate(Math.random() * shake, Math.random() * shake);
+    
+    ctx.fillStyle = "#020205";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Gambar Bintang
-    ctx.fillStyle = "white";
-    stars.forEach(s => ctx.fillRect(s.x, s.y, s.size, s.size));
+    // Draw Peluru Neon
+    bullets.forEach(b => {
+        ctx.shadowBlur = 10; ctx.shadowColor = "#fff";
+        ctx.fillStyle = "#fff";
+        ctx.fillRect(b.x, b.y, 4, 15);
+    });
 
-    // Gambar Peluru (Neon Glow)
-    ctx.shadowBlur = 15;
-    ctx.shadowColor = "#fff";
-    ctx.fillStyle = "#fff";
-    bullets.forEach(b => ctx.fillRect(b.x, b.y, b.w, b.h));
+    // Draw PowerUps
+    powerUps.forEach(p => p.draw());
 
-    // Gambar Partikel
-    particles.forEach(p => p.draw());
-
-    // Gambar Musuh (Neon Box)
+    // Draw Enemies (Hexagon-ish)
     enemies.forEach(en => {
-        ctx.shadowBlur = 15;
-        ctx.shadowColor = en.color;
-        ctx.strokeStyle = en.color;
-        ctx.lineWidth = 2;
-        ctx.strokeRect(en.x, en.y, en.w, en.h);
-        ctx.fillStyle = "rgba(255,255,255,0.1)";
+        ctx.shadowBlur = 15; ctx.shadowColor = en.color;
+        ctx.fillStyle = en.color;
         ctx.fillRect(en.x, en.y, en.w, en.h);
     });
 
-    // Gambar Pesawat Pemain (Glow Biru)
-    ctx.shadowBlur = 20;
-    ctx.shadowColor = "#00d4ff";
-    ctx.fillStyle = "#00d4ff";
+    // Draw Player (Neon Jet)
+    ctx.shadowBlur = 20; ctx.shadowColor = "#00f2ff";
+    ctx.fillStyle = "#00f2ff";
     ctx.beginPath();
-    ctx.moveTo(mouseX, mouseY - 25);
-    ctx.lineTo(mouseX - 20, mouseY + 15);
-    ctx.lineTo(mouseX + 20, mouseY + 15);
+    ctx.moveTo(playerX, playerY - 25);
+    ctx.lineTo(playerX - 15, playerY + 15);
+    ctx.lineTo(playerX + 15, playerY + 15);
     ctx.fill();
-    
-    ctx.shadowBlur = 0; // Reset glow untuk performa
 
+    ctx.restore();
     update();
-    requestAnimationFrame(draw);
+    if (gameActive) requestAnimationFrame(draw);
+    else {
+        ctx.fillStyle = "white"; ctx.textAlign = "center";
+        ctx.font = "40px Orbitron";
+        ctx.fillText("SYSTEM FAILURE", canvas.width/2, canvas.height/2);
+        ctx.font = "20px Orbitron";
+        ctx.fillText("Click to Restart", canvas.width/2, canvas.height/2 + 50);
+    }
 }
 
+canvas.addEventListener("click", () => { if(!gameActive) location.reload(); });
 draw();
 </script>
 </body>
