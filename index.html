@@ -1,7 +1,56 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Neon Striker FINAL BOSS 💀🔥</title>
+
+<style>
+body { margin:0; overflow:hidden; background:#020205; font-family:Orbitron; }
+canvas { display:block; }
+
+#menu {
+ position:absolute; width:100%; height:100%;
+ display:flex; justify-content:center; align-items:center;
+ flex-direction:column;
+ background:black; color:white;
+ z-index:10;
+}
+
+#ui {
+ position:absolute; top:10px; left:10px;
+ color:#00f2ff; text-shadow:0 0 10px #00f2ff;
+ z-index:20;
+}
+
+button { padding:10px 20px; margin:5px; }
+</style>
+</head>
+
+<body>
+
+<div id="menu">
+<h1>NEON STRIKER 💀🔥</h1>
+<button onclick="startGame()">START</button>
+<button onclick="buyWeapon()">UPGRADE SENJATA (50)</button>
+</div>
+
+<div id="ui">
+SCORE: <span id="score">0</span><br>
+HIGH: <span id="highscore">0</span><br>
+COINS: <span id="coins">0</span><br>
+LEVEL: <span id="level">1</span>
+<div style="width:150px;height:8px;background:#333">
+<div id="hpbar" style="height:100%;width:100%;background:#00ff88"></div>
+</div>
+<button onclick="paused=!paused">PAUSE</button>
+</div>
+
+<canvas id="game"></canvas>
+
 <script>
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
-
 canvas.width = innerWidth;
 canvas.height = innerHeight;
 
@@ -10,9 +59,18 @@ let player={x:canvas.width/2,y:canvas.height-80};
 let bullets=[], enemies=[], bossBullets=[], particles=[];
 let boss=null;
 
-let score=0, hp=100, level=1;
-let coins=0;
+let score=0;
+let hp=100;
+let level=1;
+let paused=false;
 let gameActive=false;
+
+let coins = Number(localStorage.getItem("coins")) || 0;
+let weaponLevel = Number(localStorage.getItem("weapon")) || 1;
+let highScore = Number(localStorage.getItem("neon_high")) || 0;
+
+document.getElementById("highscore").innerText = highScore;
+document.getElementById("coins").innerText = coins;
 
 // ===== CONTROL =====
 window.addEventListener("mousemove",e=>{
@@ -28,23 +86,25 @@ window.addEventListener("touchmove",e=>{
 let enemyImage=new Image();
 enemyImage.src="enemy.jpg";
 
-// ===== TIMER (NO MORE SETINTERVAL 💀) =====
+// ===== TIMER =====
 let shootTimer=0;
 let enemyTimer=0;
 let bossTimer=0;
+let lastBossScore=0;
 
 // ===== MAIN LOOP =====
 function gameLoop(){
  if(!gameActive) return;
-
  update();
  draw();
-
  requestAnimationFrame(gameLoop);
 }
 
 // ===== UPDATE =====
 function update(){
+ if(paused) return;
+
+ level = Math.floor(score/100)+1;
 
  shootTimer++;
  enemyTimer++;
@@ -54,16 +114,25 @@ function update(){
  if(shootTimer>10){
   shootTimer=0;
 
-  if(bullets.length<40){
-   bullets.push({x:player.x,y:player.y});
+  if(bullets.length<50){
+   if(weaponLevel==1){
+    bullets.push({x:player.x,y:player.y});
+   } else if(weaponLevel==2){
+    bullets.push({x:player.x,y:player.y});
+    bullets.push({x:player.x-10,y:player.y,vx:-2});
+    bullets.push({x:player.x+10,y:player.y,vx:2});
+   } else {
+    bullets.push({x:player.x,y:player.y});
+    bullets.push({x:player.x-15,y:player.y,vx:-3});
+    bullets.push({x:player.x+15,y:player.y,vx:3});
+   }
   }
  }
 
  // ENEMY SPAWN
  if(enemyTimer>40){
   enemyTimer=0;
-
-  if(enemies.length<15){
+  if(enemies.length<20){
    enemies.push({
     x:Math.random()*canvas.width,
     y:-40,
@@ -73,15 +142,16 @@ function update(){
  }
 
  // BOSS SPAWN
- if(score>0 && score%200===0 && !boss){
-  boss={x:canvas.width/2-50,y:50,w:100,h:100,hp:100};
+ if(score >= lastBossScore + 200){
+  boss={x:canvas.width/2-60,y:60,w:120,h:120,hp:150};
+  lastBossScore = score;
  }
 
  // BULLETS
  for(let i=bullets.length-1;i>=0;i--){
   let b=bullets[i];
   b.y-=10;
-
+  b.x+=b.vx||0;
   if(b.y<0) bullets.splice(i,1);
  }
 
@@ -90,18 +160,23 @@ function update(){
   let e=enemies[i];
   e.y+=e.speed;
 
-  // collision
   for(let j=bullets.length-1;j>=0;j--){
    let b=bullets[j];
 
    if(b.x>e.x && b.x<e.x+40 && b.y>e.y && b.y<e.y+40){
     enemies.splice(i,1);
     bullets.splice(j,1);
-    score+=10;
 
-    // particle simple
-    for(let k=0;k<3;k++){
-     particles.push({x:e.x,y:e.y,vx:Math.random()*2-1,vy:Math.random()*2-1,life:10});
+    score+=10;
+    coins+=5;
+
+    for(let k=0;k<4;k++){
+     particles.push({
+      x:e.x,y:e.y,
+      vx:(Math.random()-0.5)*4,
+      vy:(Math.random()-0.5)*4,
+      life:10
+     });
     }
     break;
    }
@@ -121,28 +196,28 @@ function update(){
    if(b.x>boss.x && b.x<boss.x+boss.w &&
       b.y>boss.y && b.y<boss.y+boss.h){
 
-    boss.hp-=2;
+    boss.hp-=3;
     bullets.splice(i,1);
    }
   }
 
   if(Math.random()<0.02){
-   bossBullets.push({x:boss.x+50,y:boss.y});
+   bossBullets.push({x:boss.x+60,y:boss.y});
   }
 
   if(boss.hp<=0){
-   boss=null;
    score+=100;
+   boss=null;
   }
  }
 
- // BOSS BULLET
+ // BOSS BULLETS
  for(let i=bossBullets.length-1;i>=0;i--){
   let b=bossBullets[i];
-  b.y+=4;
+  b.y+=5;
 
   if(Math.abs(b.x-player.x)<20 && Math.abs(b.y-player.y)<20){
-   hp-=10;
+   hp-=15;
    bossBullets.splice(i,1);
   }
 
@@ -155,18 +230,16 @@ function update(){
   p.x+=p.vx;
   p.y+=p.vy;
   p.life--;
-
   if(p.life<=0) particles.splice(i,1);
  }
 
- // LIMIT GLOBAL (ANTI FREEZE 🔥)
- if(particles.length>50) particles.splice(0,10);
- if(bossBullets.length>20) bossBullets.splice(0,5);
+ // LIMIT ANTI FREEZE
+ if(particles.length>80) particles.splice(0,10);
+ if(bossBullets.length>30) bossBullets.splice(0,5);
 
  // GAME OVER
  if(hp<=0){
-  alert("GAME OVER\nScore:"+score);
-  location.reload();
+  gameOver();
  }
 }
 
@@ -211,10 +284,11 @@ function draw(){
  ctx.fillStyle="orange";
  particles.forEach(p=>ctx.fillRect(p.x,p.y,2,2));
 
- // UI
- ctx.fillStyle="white";
- ctx.fillText("Score: "+score,20,30);
- ctx.fillText("HP: "+hp,20,50);
+ // UI update
+ document.getElementById("score").innerText=score;
+ document.getElementById("coins").innerText=coins;
+ document.getElementById("level").innerText=level;
+ document.getElementById("hpbar").style.width=hp+"%";
 }
 
 // ===== START =====
@@ -223,4 +297,31 @@ function startGame(){
  gameActive=true;
  gameLoop();
 }
+
+// ===== SHOP =====
+function buyWeapon(){
+ if(coins>=50){
+  coins-=50;
+  weaponLevel++;
+  localStorage.setItem("weapon",weaponLevel);
+  alert("Upgrade berhasil!");
+ }
+}
+
+// ===== GAME OVER =====
+function gameOver(){
+ gameActive=false;
+
+ localStorage.setItem("coins",coins);
+
+ if(score>highScore){
+  localStorage.setItem("neon_high",score);
+ }
+
+ alert("GAME OVER\nScore: "+score);
+ location.reload();
+}
 </script>
+
+</body>
+</html>
