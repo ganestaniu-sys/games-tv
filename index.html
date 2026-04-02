@@ -194,20 +194,22 @@ function draw() {
     });
 
     // Pemain
-    ctx.shadowBlur = 20; ctx.shadowColor = playerColor;
-    ctx.fillStyle = playerColor;
-    ctx.beginPath();
-    if(selectedType === 'tanker') {
-        ctx.arc(playerX, playerY, 20, 0, Math.PI*2);
-    } else {
-        ctx.moveTo(playerX, playerY - 25);
-        ctx.lineTo(playerX - 20, playerY + 15);
-        ctx.lineTo(playerX + 20, playerY + 15);
-    }
-    ctx.fill();
+    //ctx.shadowBlur = 20; ctx.shadowColor = playerColor;
+    //ctx.fillStyle = playerColor;
+    //ctx.beginPath();
+    //if(selectedType === 'tanker') {
+       // ctx.arc(playerX, playerY, 20, 0, Math.PI*2);
+   // } else {
+       // ctx.moveTo(playerX, playerY - 25);
+       // ctx.lineTo(playerX - 20, playerY + 15);
+        //ctx.lineTo(playerX + 20, playerY + 15);
+    //}
+    //ctx.fill();
 
-    update();
-    requestAnimationFrame(draw);
+    //update();
+    //requestAnimationFrame(draw);
+
+    ctx.drawImage(playerImg, playerX - 30, playerY - 30, 60, 60);
 }
 </script>
 </body>
