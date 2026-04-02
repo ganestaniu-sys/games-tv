@@ -1,327 +1,340 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Neon Striker FINAL BOSS 💀🔥</title>
-
-<style>
-body { margin:0; overflow:hidden; background:#020205; font-family:Orbitron; }
-canvas { display:block; }
-
-#menu {
- position:absolute; width:100%; height:100%;
- display:flex; justify-content:center; align-items:center;
- flex-direction:column;
- background:black; color:white;
- z-index:10;
-}
-
-#ui {
- position:absolute; top:10px; left:10px;
- color:#00f2ff; text-shadow:0 0 10px #00f2ff;
- z-index:20;
-}
-
-button { padding:10px 20px; margin:5px; }
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Neon Striker - Custom Enemy JPG</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body { margin: 0; overflow: hidden; background: #020205; font-family: 'Orbitron', sans-serif; touch-action: none; }
+        canvas { display: block; }
+        #ui {
+            position: absolute; top: 15px; left: 15px; color: #00f2ff;
+            font-size: 18px; text-shadow: 0 0 10px #00f2ff; pointer-events: none;
+            z-index: 20;
+        }
+        #menu {
+            position: absolute; width: 100%; height: 100%;
+            background: rgba(2, 2, 5, 0.95);
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            z-index: 10; color: white;
+        }
+        .plane-options { display: flex; gap: 20px; margin-top: 30px; flex-wrap: wrap; justify-content: center; }
+        .card {
+            background: rgba(255, 255, 255, 0.05);
+            border: 2px solid #333; padding: 20px; border-radius: 15px;
+            text-align: center; width: 100px; cursor: pointer; transition: 0.3s;
+        }
+        .card:hover { border-color: #00f2ff; background: rgba(0, 242, 255, 0.1); }
+        .card h3 { font-size: 12px; margin: 10px 0; }
+        .card.blue { border-color: #00d4ff; }
+        .card.red { border-color: #ff4b2b; }
+        .card.gold { border-color: #ffcc00; }
+        #btn-start { display: none; margin-top: 30px; padding: 15px 40px; background: #00f2ff; border: none; border-radius: 50px; font-family: 'Orbitron'; font-weight: bold; cursor: pointer; }
+        @media (max-width: 600px) {
+            .card { width: 80px; padding: 15px; }
+            .card h3 { font-size: 10px; }
+        }
+        .instruction {
+            position: fixed; bottom: 10px; left: 0; right: 0; text-align: center;
+            color: #888; font-size: 10px; font-family: monospace; background: rgba(0,0,0,0.5);
+            padding: 4px; z-index: 20;
+        }
+    </style>
 </head>
-
 <body>
 
+<div id="ui">SCORE: <span id="score">0</span></div>
+
 <div id="menu">
-<h1>NEON STRIKER 💀🔥</h1>
-<button onclick="startGame()">START</button>
-<button onclick="buyWeapon()">UPGRADE SENJATA (50)</button>
+    <h1>PILIH PESAWAT</h1>
+    <div class="plane-options">
+        <div class="card blue" onclick="selectPlane('balanced', '#00d4ff')">
+            <div style="color: #00d4ff; font-size: 30px;">▲</div>
+            <h3>BALANCED</h3>
+        </div>
+        <div class="card red" onclick="selectPlane('speedster', '#ff4b2b')">
+            <div style="color: #ff4b2b; font-size: 30px;">🚀</div>
+            <h3>SPEED</h3>
+        </div>
+        <div class="card gold" onclick="selectPlane('tanker', '#ffcc00')">
+            <div style="color: #ffcc00; font-size: 30px;">🛸</div>
+            <h3>POWER</h3>
+        </div>
+    </div>
+    <button id="btn-start" onclick="startGame()">START MISSION</button>
 </div>
 
-<div id="ui">
-SCORE: <span id="score">0</span><br>
-HIGH: <span id="highscore">0</span><br>
-COINS: <span id="coins">0</span><br>
-LEVEL: <span id="level">1</span>
-<div style="width:150px;height:8px;background:#333">
-<div id="hpbar" style="height:100%;width:100%;background:#00ff88"></div>
-</div>
-<button onclick="paused=!paused">PAUSE</button>
-</div>
-
-<canvas id="game"></canvas>
+<canvas id="gameCanvas"></canvas>
+<div class="instruction">🎮 Geser jari / mouse untuk mengendalikan | Gambar musuh: enemy.jpg (ganti sesukamu)</div>
 
 <script>
-const canvas = document.getElementById("game");
+const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
-canvas.width = innerWidth;
-canvas.height = innerHeight;
+const scoreElement = document.getElementById("score");
+const menu = document.getElementById("menu");
 
-// ===== DATA =====
-let player={x:canvas.width/2,y:canvas.height-80};
-let bullets=[], enemies=[], bossBullets=[], particles=[];
-let boss=null;
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
 
-let score=0;
-let hp=100;
-let level=1;
-let paused=false;
-let gameActive=false;
+let score = 0;
+let gameActive = false;
+let selectedType = 'balanced';
+let playerColor = '#00f2ff';
 
-let coins = Number(localStorage.getItem("coins")) || 0;
-let weaponLevel = Number(localStorage.getItem("weapon")) || 1;
-let highScore = Number(localStorage.getItem("neon_high")) || 0;
+// Input Posisi
+let targetX = canvas.width / 2;
+let targetY = canvas.height - 100;
+let playerX = targetX;
+let playerY = targetY;
 
-document.getElementById("highscore").innerText = highScore;
-document.getElementById("coins").innerText = coins;
-
-// ===== CONTROL =====
-window.addEventListener("mousemove",e=>{
- player.x=e.clientX;
- player.y=e.clientY;
-});
-window.addEventListener("touchmove",e=>{
- player.x=e.touches[0].clientX;
- player.y=e.touches[0].clientY;
-});
-
-// ===== IMAGE =====
-let enemyImage=new Image();
-enemyImage.src="enemy.jpg";
-
-// ===== TIMER =====
-let shootTimer=0;
-let enemyTimer=0;
-let bossTimer=0;
-let lastBossScore=0;
-
-// ===== MAIN LOOP =====
-function gameLoop(){
- if(!gameActive) return;
- update();
- draw();
- requestAnimationFrame(gameLoop);
-}
-
-// ===== UPDATE =====
-function update(){
- if(paused) return;
-
- level = Math.floor(score/100)+1;
-
- shootTimer++;
- enemyTimer++;
- bossTimer++;
-
- // SHOOT
- if(shootTimer>10){
-  shootTimer=0;
-
-  if(bullets.length<50){
-   if(weaponLevel==1){
-    bullets.push({x:player.x,y:player.y});
-   } else if(weaponLevel==2){
-    bullets.push({x:player.x,y:player.y});
-    bullets.push({x:player.x-10,y:player.y,vx:-2});
-    bullets.push({x:player.x+10,y:player.y,vx:2});
-   } else {
-    bullets.push({x:player.x,y:player.y});
-    bullets.push({x:player.x-15,y:player.y,vx:-3});
-    bullets.push({x:player.x+15,y:player.y,vx:3});
-   }
-  }
- }
-
- // ENEMY SPAWN
- if(enemyTimer>40){
-  enemyTimer=0;
-  if(enemies.length<20){
-   enemies.push({
-    x:Math.random()*canvas.width,
-    y:-40,
-    speed:2+Math.random()*2
-   });
-  }
- }
-
- // BOSS SPAWN
- if(score >= lastBossScore + 200){
-  boss={x:canvas.width/2-60,y:60,w:120,h:120,hp:150};
-  lastBossScore = score;
- }
-
- // BULLETS
- for(let i=bullets.length-1;i>=0;i--){
-  let b=bullets[i];
-  b.y-=10;
-  b.x+=b.vx||0;
-  if(b.y<0) bullets.splice(i,1);
- }
-
- // ENEMIES
- for(let i=enemies.length-1;i>=0;i--){
-  let e=enemies[i];
-  e.y+=e.speed;
-
-  for(let j=bullets.length-1;j>=0;j--){
-   let b=bullets[j];
-
-   if(b.x>e.x && b.x<e.x+40 && b.y>e.y && b.y<e.y+40){
-    enemies.splice(i,1);
-    bullets.splice(j,1);
-
-    score+=10;
-    coins+=5;
-
-    for(let k=0;k<4;k++){
-     particles.push({
-      x:e.x,y:e.y,
-      vx:(Math.random()-0.5)*4,
-      vy:(Math.random()-0.5)*4,
-      life:10
-     });
+// Handler Input (Mouse & Touch)
+function handleMove(e) {
+    let clientX, clientY;
+    if(e.touches) {
+        clientX = e.touches[0].clientX;
+        clientY = e.touches[0].clientY;
+        e.preventDefault();
+    } else {
+        clientX = e.clientX;
+        clientY = e.clientY;
     }
-    break;
-   }
-  }
-
-  if(e.y>canvas.height){
-   enemies.splice(i,1);
-   hp-=5;
-  }
- }
-
- // BOSS
- if(boss){
-  for(let i=bullets.length-1;i>=0;i--){
-   let b=bullets[i];
-
-   if(b.x>boss.x && b.x<boss.x+boss.w &&
-      b.y>boss.y && b.y<boss.y+boss.h){
-
-    boss.hp-=3;
-    bullets.splice(i,1);
-   }
-  }
-
-  if(Math.random()<0.02){
-   bossBullets.push({x:boss.x+60,y:boss.y});
-  }
-
-  if(boss.hp<=0){
-   score+=100;
-   boss=null;
-  }
- }
-
- // BOSS BULLETS
- for(let i=bossBullets.length-1;i>=0;i--){
-  let b=bossBullets[i];
-  b.y+=5;
-
-  if(Math.abs(b.x-player.x)<20 && Math.abs(b.y-player.y)<20){
-   hp-=15;
-   bossBullets.splice(i,1);
-  }
-
-  if(b.y>canvas.height) bossBullets.splice(i,1);
- }
-
- // PARTICLES
- for(let i=particles.length-1;i>=0;i--){
-  let p=particles[i];
-  p.x+=p.vx;
-  p.y+=p.vy;
-  p.life--;
-  if(p.life<=0) particles.splice(i,1);
- }
-
- // LIMIT ANTI FREEZE
- if(particles.length>80) particles.splice(0,10);
- if(bossBullets.length>30) bossBullets.splice(0,5);
-
- // GAME OVER
- if(hp<=0){
-  gameOver();
- }
+    let boundX = Math.min(Math.max(clientX, 30), canvas.width - 30);
+    let boundY = Math.min(Math.max(clientY - 40, 60), canvas.height - 60);
+    targetX = boundX;
+    targetY = boundY;
 }
 
-// ===== DRAW =====
-function draw(){
- ctx.fillStyle="#020205";
- ctx.fillRect(0,0,canvas.width,canvas.height);
+window.addEventListener("mousemove", handleMove);
+window.addEventListener("touchmove", handleMove, { passive: false });
+window.addEventListener("touchstart", handleMove);
 
- // player
- ctx.fillStyle="#00f2ff";
- ctx.beginPath();
- ctx.moveTo(player.x,player.y-20);
- ctx.lineTo(player.x-15,player.y+15);
- ctx.lineTo(player.x+15,player.y+15);
- ctx.fill();
+// ======================= GAMBAR MUSUH (JPG EKSTERNAL) =======================
+// Ganti file "enemy.jpg" dengan gambar JPG pilihan Anda.
+// Pastikan file tersebut berada di folder yang sama dengan file HTML.
+let enemyImage = new Image();
+let enemyImageReady = false;
+let enemyLoadError = false;
 
- // bullets
- ctx.fillStyle="white";
- bullets.forEach(b=>ctx.fillRect(b.x,b.y,3,8));
+// Nama file gambar musuh - BISA DIUBAH SESUAI KESUKAAN ANDA
+const ENEMY_IMG_SRC = "enemy.jpg";   // <-- GANTI dengan path gambar JPG anda
 
- // enemies
- enemies.forEach(e=>{
-  if(enemyImage.complete){
-   ctx.drawImage(enemyImage,e.x,e.y,40,40);
-  } else {
-   ctx.fillStyle="red";
-   ctx.fillRect(e.x,e.y,40,40);
-  }
- });
+enemyImage.onload = () => {
+    console.log("Gambar musuh berhasil dimuat:", ENEMY_IMG_SRC);
+    enemyImageReady = true;
+};
+enemyImage.onerror = () => {
+    console.warn("Gagal memuat gambar:", ENEMY_IMG_SRC, " - menggunakan fallback shape.");
+    enemyLoadError = true;
+    enemyImageReady = false;
+};
+enemyImage.src = ENEMY_IMG_SRC;
 
- // boss
- if(boss){
-  ctx.strokeStyle="purple";
-  ctx.strokeRect(boss.x,boss.y,boss.w,boss.h);
- }
+// ======================= GAME LOGIC =======================
+const bullets = [];
+const enemies = [];
 
- // boss bullets
- ctx.fillStyle="red";
- bossBullets.forEach(b=>ctx.fillRect(b.x,b.y,4,10));
+function spawnEnemy() {
+    if (!gameActive) return;
+    let size = 48; // ukuran musuh (sesuaikan dengan gambar Anda)
+    enemies.push({
+        x: Math.random() * (canvas.width - size),
+        y: -size,
+        w: size,
+        h: size,
+        speed: (selectedType === 'speedster' ? 5 : 3) + (score / 250),
+    });
+}
+setInterval(spawnEnemy, 800);
 
- // particles
- ctx.fillStyle="orange";
- particles.forEach(p=>ctx.fillRect(p.x,p.y,2,2));
+// Tembakan otomatis
+setInterval(() => {
+    if (!gameActive) return;
+    let bSpeed = selectedType === 'speedster' ? -18 : -12;
+    
+    if (selectedType === 'balanced') {
+        bullets.push({ x: playerX, y: playerY - 20, vx: 0, vy: bSpeed, w: 4, h: 15 });
+    } else if (selectedType === 'speedster') {
+        bullets.push({ x: playerX, y: playerY - 20, vx: 0, vy: bSpeed, w: 4, h: 15 });
+    } else if (selectedType === 'tanker') {
+        bullets.push({ x: playerX - 10, y: playerY - 20, vx: -1, vy: bSpeed, w: 4, h: 15 });
+        bullets.push({ x: playerX + 10, y: playerY - 20, vx: 1, vy: bSpeed, w: 4, h: 15 });
+    }
+}, 150);
 
- // UI update
- document.getElementById("score").innerText=score;
- document.getElementById("coins").innerText=coins;
- document.getElementById("level").innerText=level;
- document.getElementById("hpbar").style.width=hp+"%";
+function update() {
+    playerX += (targetX - playerX) * 0.15;
+    playerY += (targetY - playerY) * 0.15;
+    playerX = Math.min(Math.max(playerX, 25), canvas.width - 25);
+    playerY = Math.min(Math.max(playerY, 50), canvas.height - 50);
+    
+    // Update peluru
+    for (let i = 0; i < bullets.length; i++) {
+        bullets[i].x += bullets[i].vx;
+        bullets[i].y += bullets[i].vy;
+        if (bullets[i].y < 0 || bullets[i].y > canvas.height || bullets[i].x < 0 || bullets[i].x > canvas.width) {
+            bullets.splice(i, 1);
+            i--;
+        }
+    }
+    
+    // Update musuh & collision
+    for (let i = 0; i < enemies.length; i++) {
+        const en = enemies[i];
+        en.y += en.speed;
+        
+        // Collision dengan peluru
+        for (let j = 0; j < bullets.length; j++) {
+            const b = bullets[j];
+            if (b.x < en.x + en.w && b.x + b.w > en.x && b.y < en.y + en.h && b.y + b.h > en.y) {
+                enemies.splice(i, 1);
+                bullets.splice(j, 1);
+                score += 10;
+                scoreElement.innerText = score;
+                i--;
+                break;
+            }
+        }
+        
+        if (enemies[i] && enemies[i].y > canvas.height) {
+            enemies.splice(i, 1);
+            i--;
+        }
+    }
+    
+    // Collision player dengan musuh
+    for (let i = 0; i < enemies.length; i++) {
+        const en = enemies[i];
+        if (playerX + 20 > en.x && playerX - 20 < en.x + en.w &&
+            playerY + 20 > en.y && playerY - 20 < en.y + en.h) {
+            gameActive = false;
+            alert("💀 GAME OVER! Skor akhir: " + score);
+            location.reload();
+            return;
+        }
+    }
 }
 
-// ===== START =====
-function startGame(){
- document.getElementById("menu").style.display="none";
- gameActive=true;
- gameLoop();
+function draw() {
+    if (!gameActive) return;
+    
+    ctx.fillStyle = "#020205";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    // Efek bintang sederhana
+    ctx.fillStyle = "white";
+    for (let i = 0; i < 100; i++) {
+        let starX = (i * 131) % canvas.width;
+        let starY = (i * 253) % canvas.height;
+        ctx.fillRect(starX, starY, 1, 1);
+    }
+    
+    // Peluru
+    ctx.shadowBlur = 8;
+    ctx.shadowColor = "#0af";
+    bullets.forEach(b => {
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(b.x - 2, b.y, 4, 15);
+        ctx.fillStyle = "#00ffff";
+        ctx.fillRect(b.x - 1, b.y + 3, 2, 8);
+    });
+    
+    // MUSUH - Menggambar gambar JPG jika tersedia, jika tidak pakai kotak berwarna
+    enemies.forEach(en => {
+        if (enemyImageReady && enemyImage.complete && enemyImage.naturalWidth > 0) {
+            ctx.drawImage(enemyImage, en.x, en.y, en.w, en.h);
+        } else {
+            // Fallback jika gambar gagal dimuat: kotak merah dengan wajah
+            ctx.fillStyle = "#ff3366";
+            ctx.fillRect(en.x, en.y, en.w, en.h);
+            ctx.fillStyle = "white";
+            ctx.font = "bold 24px monospace";
+            ctx.fillText("👾", en.x + en.w/2 - 12, en.y + en.h/2 + 8);
+            ctx.fillStyle = "black";
+            ctx.fillRect(en.x + 10, en.y + 12, 6, 6);
+            ctx.fillRect(en.x + en.w - 16, en.y + 12, 6, 6);
+        }
+        // Outline merah (efek musuh)
+        ctx.strokeStyle = "#ff0000";
+        ctx.lineWidth = 2;
+        ctx.strokeRect(en.x, en.y, en.w, en.h);
+    });
+    
+    // Gambar PESAWAT PEMAIN
+    ctx.shadowBlur = 15;
+    ctx.shadowColor = playerColor;
+    ctx.fillStyle = playerColor;
+    ctx.beginPath();
+    if (selectedType === 'tanker') {
+        ctx.arc(playerX, playerY, 20, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "white";
+        ctx.font = "bold 16px Orbitron";
+        ctx.fillText("🛡️", playerX - 12, playerY + 8);
+    } else if (selectedType === 'speedster') {
+        ctx.moveTo(playerX, playerY - 25);
+        ctx.lineTo(playerX - 18, playerY + 12);
+        ctx.lineTo(playerX - 6, playerY + 5);
+        ctx.lineTo(playerX - 6, playerY + 18);
+        ctx.lineTo(playerX, playerY + 12);
+        ctx.lineTo(playerX + 6, playerY + 18);
+        ctx.lineTo(playerX + 6, playerY + 5);
+        ctx.lineTo(playerX + 18, playerY + 12);
+        ctx.fill();
+        ctx.fillStyle = "#ffaa44";
+        ctx.fillRect(playerX - 22, playerY - 5, 8, 8);
+        ctx.fillRect(playerX + 14, playerY - 5, 8, 8);
+    } else {
+        ctx.moveTo(playerX, playerY - 25);
+        ctx.lineTo(playerX - 20, playerY + 15);
+        ctx.lineTo(playerX - 8, playerY + 5);
+        ctx.lineTo(playerX - 8, playerY + 18);
+        ctx.lineTo(playerX, playerY + 12);
+        ctx.lineTo(playerX + 8, playerY + 18);
+        ctx.lineTo(playerX + 8, playerY + 5);
+        ctx.lineTo(playerX + 20, playerY + 15);
+        ctx.fill();
+    }
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    
+    update();
+    requestAnimationFrame(draw);
 }
 
-// ===== SHOP =====
-function buyWeapon(){
- if(coins>=50){
-  coins-=50;
-  weaponLevel++;
-  localStorage.setItem("weapon",weaponLevel);
-  alert("Upgrade berhasil!");
- }
+// ======================= MENU & START =======================
+function selectPlane(type, color) {
+    selectedType = type;
+    playerColor = color;
+    document.querySelectorAll('.card').forEach(c => c.style.boxShadow = 'none');
+    document.getElementById('btn-start').style.display = 'block';
+    event.currentTarget.style.boxShadow = `0 0 20px ${color}`;
 }
 
-// ===== GAME OVER =====
-function gameOver(){
- gameActive=false;
-
- localStorage.setItem("coins",coins);
-
- if(score>highScore){
-  localStorage.setItem("neon_high",score);
- }
-
- alert("GAME OVER\nScore: "+score);
- location.reload();
+function startGame() {
+    menu.style.display = 'none';
+    gameActive = true;
+    score = 0;
+    scoreElement.innerText = "0";
+    targetX = canvas.width / 2;
+    targetY = canvas.height - 100;
+    playerX = targetX;
+    playerY = targetY;
+    bullets.length = 0;
+    enemies.length = 0;
+    requestAnimationFrame(draw);
 }
+
+window.addEventListener('resize', () => {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    targetX = Math.min(Math.max(targetX, 30), canvas.width - 30);
+    targetY = Math.min(Math.max(targetY, 60), canvas.height - 60);
+});
+
+menu.style.display = 'flex';
+gameActive = false;
 </script>
-
 </body>
 </html>
+
