@@ -1,90 +1,18 @@
-<!DOCTYPE html>
-<html lang="id">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Neon Striker FINAL</title>
-
-<style>
-body { margin:0; overflow:hidden; background:#020205; font-family:Orbitron; }
-canvas { display:block; }
-
-#ui {
- position:absolute; top:10px; left:10px;
- color:#00f2ff; text-shadow:0 0 10px #00f2ff;
- z-index:20;
-}
-
-#menu {
- position:absolute; width:100%; height:100%;
- display:flex; justify-content:center; align-items:center;
- background:black; color:white; flex-direction:column;
- z-index:10;
-}
-
-button { padding:10px 20px; margin:5px; }
-</style>
-</head>
-
-<body>
-
-<div id="menu">
-<h1>NEON STRIKER FINAL 💀🔥</h1>
-<button onclick="startGame()">START</button>
-<button onclick="buyWeapon()">UPGRADE SENJATA (50)</button>
-</div>
-
-<div id="ui">
-SCORE: <span id="score">0</span><br>
-HIGH: <span id="highscore">0</span><br>
-COINS: <span id="coins">0</span><br>
-LEVEL: <span id="level">1</span>
-<div style="width:150px;height:8px;background:#333">
-<div id="hpbar" style="height:100%;width:100%;background:#00ff88"></div>
-</div>
-<button onclick="paused=!paused">PAUSE</button>
-</div>
-
-<canvas id="game"></canvas>
-
 <script>
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
+
 canvas.width = innerWidth;
 canvas.height = innerHeight;
 
 // ===== DATA =====
-let score=0;
-let hp=100;
-let coins = Number(localStorage.getItem("coins")) || 0;
-let weaponLevel = Number(localStorage.getItem("weapon")) || 1;
-let highScore = Number(localStorage.getItem("neon_high")) || 0;
-
-document.getElementById("highscore").innerText = highScore;
-document.getElementById("coins").innerText = coins;
-
-let level=1;
-let paused=false;
-let gameActive=false;
-
 let player={x:canvas.width/2,y:canvas.height-80};
-let bullets=[], enemies=[], boss=null, bossBullets=[];
-let particles=[], stars=[];
+let bullets=[], enemies=[], bossBullets=[], particles=[];
+let boss=null;
 
-let lastBossScore = 0;
-
-// ===== SOUND =====
-const shootSound=new Audio("https://actions.google.com/sounds/v1/alarms/beep_short.ogg");
-const hitSound=new Audio("https://actions.google.com/sounds/v1/explosions/explosion.ogg");
-
-// ===== STAR BACKGROUND =====
-for(let i=0;i<60;i++){
- stars.push({
-  x:Math.random()*canvas.width,
-  y:Math.random()*canvas.height,
-  speed:Math.random()*2+1
- });
-}
+let score=0, hp=100, level=1;
+let coins=0;
+let gameActive=false;
 
 // ===== CONTROL =====
 window.addEventListener("mousemove",e=>{
@@ -96,101 +24,84 @@ window.addEventListener("touchmove",e=>{
  player.y=e.touches[0].clientY;
 });
 
-// ===== ENEMY IMAGE =====
+// ===== IMAGE =====
 let enemyImage=new Image();
 enemyImage.src="enemy.jpg";
 
-// ===== SHOOT =====
-setInterval(()=>{
- if(!gameActive || paused) return;
- if(bullets.length>50) return;
+// ===== TIMER (NO MORE SETINTERVAL 💀) =====
+let shootTimer=0;
+let enemyTimer=0;
+let bossTimer=0;
 
- if (weaponLevel == 1) {
-  bullets.push({x:player.x,y:player.y-20,vx:0});
- }
- else if (weaponLevel == 2) {
-  bullets.push({x:player.x,y:player.y-20,vx:0});
-  bullets.push({x:player.x-10,y:player.y-20,vx:-2});
-  bullets.push({x:player.x+10,y:player.y-20,vx:2});
- }
- else {
-  bullets.push({x:player.x,y:player.y-20,vx:0});
-  bullets.push({x:player.x-15,y:player.y-20,vx:-3});
-  bullets.push({x:player.x+15,y:player.y-20,vx:3});
- }
+// ===== MAIN LOOP =====
+function gameLoop(){
+ if(!gameActive) return;
 
- if(shootSound.paused){
-  shootSound.currentTime=0;
-  shootSound.play();
- }
+ update();
+ draw();
 
-},180);
-
-// ===== ENEMY =====
-setInterval(()=>{
- if(!gameActive || paused) return;
- if(enemies.length>20) return;
-
- enemies.push({
-  x:Math.random()*canvas.width,
-  y:-40,
-  speed:3,
-  zigzag:Math.random()*2+1
- });
-},800);
-
-// ===== BOSS =====
-function spawnBoss(){
- boss={x:canvas.width/2-50,y:60,w:100,h:100,hp:200};
-}
-
-function checkBoss(){
- if(score >= lastBossScore + 200){
-  spawnBoss();
-  lastBossScore = score;
- }
+ requestAnimationFrame(gameLoop);
 }
 
 // ===== UPDATE =====
 function update(){
- if(paused) return;
 
- level=Math.floor(score/100)+1;
+ shootTimer++;
+ enemyTimer++;
+ bossTimer++;
 
- // bullets
+ // SHOOT
+ if(shootTimer>10){
+  shootTimer=0;
+
+  if(bullets.length<40){
+   bullets.push({x:player.x,y:player.y});
+  }
+ }
+
+ // ENEMY SPAWN
+ if(enemyTimer>40){
+  enemyTimer=0;
+
+  if(enemies.length<15){
+   enemies.push({
+    x:Math.random()*canvas.width,
+    y:-40,
+    speed:2+Math.random()*2
+   });
+  }
+ }
+
+ // BOSS SPAWN
+ if(score>0 && score%200===0 && !boss){
+  boss={x:canvas.width/2-50,y:50,w:100,h:100,hp:100};
+ }
+
+ // BULLETS
  for(let i=bullets.length-1;i>=0;i--){
   let b=bullets[i];
   b.y-=10;
-  b.x+=b.vx||0;
+
   if(b.y<0) bullets.splice(i,1);
  }
 
- // enemies
+ // ENEMIES
  for(let i=enemies.length-1;i>=0;i--){
   let e=enemies[i];
   e.y+=e.speed;
-  e.x+=Math.sin(e.y*0.05)*e.zigzag;
 
+  // collision
   for(let j=bullets.length-1;j>=0;j--){
    let b=bullets[j];
 
    if(b.x>e.x && b.x<e.x+40 && b.y>e.y && b.y<e.y+40){
     enemies.splice(i,1);
     bullets.splice(j,1);
-
     score+=10;
-    coins+=5;
 
-    hitSound.currentTime=0;
-    hitSound.play();
-
-    for(let k=0;k<5;k++){
-     particles.push({
-      x:e.x,y:e.y,
-      vx:(Math.random()-0.5)*4,
-      vy:(Math.random()-0.5)*4,
-      life:15
-     });
+    // particle simple
+    for(let k=0;k<3;k++){
+     particles.push({x:e.x,y:e.y,vx:Math.random()*2-1,vy:Math.random()*2-1,life:10});
     }
     break;
    }
@@ -198,19 +109,19 @@ function update(){
 
   if(e.y>canvas.height){
    enemies.splice(i,1);
-   hp-=10;
+   hp-=5;
   }
  }
 
- // boss
- checkBoss();
-
+ // BOSS
  if(boss){
   for(let i=bullets.length-1;i>=0;i--){
    let b=bullets[i];
+
    if(b.x>boss.x && b.x<boss.x+boss.w &&
       b.y>boss.y && b.y<boss.y+boss.h){
-    boss.hp-=5;
+
+    boss.hp-=2;
     bullets.splice(i,1);
    }
   }
@@ -220,69 +131,61 @@ function update(){
   }
 
   if(boss.hp<=0){
-   score+=100;
    boss=null;
+   score+=100;
   }
  }
 
- // boss bullets
+ // BOSS BULLET
  for(let i=bossBullets.length-1;i>=0;i--){
   let b=bossBullets[i];
-  b.y+=5;
+  b.y+=4;
 
   if(Math.abs(b.x-player.x)<20 && Math.abs(b.y-player.y)<20){
-   hp-=20;
+   hp-=10;
    bossBullets.splice(i,1);
   }
 
-  if(b.y>canvas.height){
-   bossBullets.splice(i,1);
-  }
+  if(b.y>canvas.height) bossBullets.splice(i,1);
  }
 
- // particles
+ // PARTICLES
  for(let i=particles.length-1;i>=0;i--){
   let p=particles[i];
   p.x+=p.vx;
   p.y+=p.vy;
   p.life--;
+
   if(p.life<=0) particles.splice(i,1);
  }
 
- if(particles.length>100) particles.splice(0,10);
+ // LIMIT GLOBAL (ANTI FREEZE 🔥)
+ if(particles.length>50) particles.splice(0,10);
+ if(bossBullets.length>20) bossBullets.splice(0,5);
 
- if(hp<=0) gameOver();
+ // GAME OVER
+ if(hp<=0){
+  alert("GAME OVER\nScore:"+score);
+  location.reload();
+ }
 }
 
 // ===== DRAW =====
 function draw(){
- if(!gameActive) return;
-
  ctx.fillStyle="#020205";
  ctx.fillRect(0,0,canvas.width,canvas.height);
-
- // stars
- ctx.fillStyle="white";
- stars.forEach(s=>{
-  s.y+=s.speed;
-  if(s.y>canvas.height){
-   s.y=0;
-   s.x=Math.random()*canvas.width;
-  }
-  ctx.fillRect(s.x,s.y,2,2);
- });
 
  // player
  ctx.fillStyle="#00f2ff";
  ctx.beginPath();
- ctx.moveTo(player.x,player.y-25);
- ctx.lineTo(player.x-20,player.y+15);
- ctx.lineTo(player.x+20,player.y+15);
+ ctx.moveTo(player.x,player.y-20);
+ ctx.lineTo(player.x-15,player.y+15);
+ ctx.lineTo(player.x+15,player.y+15);
  ctx.fill();
 
  // bullets
  ctx.fillStyle="white";
- bullets.forEach(b=>ctx.fillRect(b.x,b.y,3,10));
+ bullets.forEach(b=>ctx.fillRect(b.x,b.y,3,8));
 
  // enemies
  enemies.forEach(e=>{
@@ -296,58 +199,28 @@ function draw(){
 
  // boss
  if(boss){
-  ctx.strokeStyle="#ff00ff";
+  ctx.strokeStyle="purple";
   ctx.strokeRect(boss.x,boss.y,boss.w,boss.h);
  }
 
  // boss bullets
  ctx.fillStyle="red";
- bossBullets.forEach(b=>ctx.fillRect(b.x,b.y,5,10));
+ bossBullets.forEach(b=>ctx.fillRect(b.x,b.y,4,10));
 
  // particles
  ctx.fillStyle="orange";
- particles.forEach(p=>ctx.fillRect(p.x,p.y,3,3));
+ particles.forEach(p=>ctx.fillRect(p.x,p.y,2,2));
 
- update();
-
- document.getElementById("score").innerText=score;
- document.getElementById("coins").innerText=coins;
- document.getElementById("level").innerText=level;
- document.getElementById("hpbar").style.width=hp+"%";
-
- requestAnimationFrame(draw);
+ // UI
+ ctx.fillStyle="white";
+ ctx.fillText("Score: "+score,20,30);
+ ctx.fillText("HP: "+hp,20,50);
 }
 
-// ===== SHOP =====
-function buyWeapon(){
- if(coins>=50){
-  coins-=50;
-  weaponLevel++;
-  localStorage.setItem("weapon",weaponLevel);
-  alert("Upgrade berhasil!");
- }
-}
-
-// ===== GAME =====
+// ===== START =====
 function startGame(){
  document.getElementById("menu").style.display="none";
  gameActive=true;
- draw();
-}
-
-function gameOver(){
- gameActive=false;
-
- localStorage.setItem("coins",coins);
-
- if(score>highScore){
-  localStorage.setItem("neon_high",score);
- }
-
- alert("GAME OVER\nScore: "+score);
- location.reload();
+ gameLoop();
 }
 </script>
-
-</body>
-</html>
