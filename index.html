@@ -3,18 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Neon Striker: Mobile Edition</title>
+    <title>Neon Striker - Custom Enemy JPG</title>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
     <style>
         body { margin: 0; overflow: hidden; background: #020205; font-family: 'Orbitron', sans-serif; touch-action: none; }
         canvas { display: block; }
-        
         #ui {
             position: absolute; top: 15px; left: 15px; color: #00f2ff;
             font-size: 18px; text-shadow: 0 0 10px #00f2ff; pointer-events: none;
+            z-index: 20;
         }
-
-        /* Menu Pilihan Pesawat */
         #menu {
             position: absolute; width: 100%; height: 100%;
             background: rgba(2, 2, 5, 0.95);
@@ -29,11 +27,19 @@
         }
         .card:hover { border-color: #00f2ff; background: rgba(0, 242, 255, 0.1); }
         .card h3 { font-size: 12px; margin: 10px 0; }
-        .card.blue { border-color: #ffffff; }
+        .card.blue { border-color: #00d4ff; }
         .card.red { border-color: #ff4b2b; }
         .card.gold { border-color: #ffcc00; }
-        
         #btn-start { display: none; margin-top: 30px; padding: 15px 40px; background: #00f2ff; border: none; border-radius: 50px; font-family: 'Orbitron'; font-weight: bold; cursor: pointer; }
+        @media (max-width: 600px) {
+            .card { width: 80px; padding: 15px; }
+            .card h3 { font-size: 10px; }
+        }
+        .instruction {
+            position: fixed; bottom: 10px; left: 0; right: 0; text-align: center;
+            color: #888; font-size: 10px; font-family: monospace; background: rgba(0,0,0,0.5);
+            padding: 4px; z-index: 20;
+        }
     </style>
 </head>
 <body>
@@ -43,8 +49,8 @@
 <div id="menu">
     <h1>PILIH PESAWAT</h1>
     <div class="plane-options">
-        <div class="card blue" onclick="selectPlane('balanced', ,'#ffffff')">
-            <div style="color: #ffffff; font-size: 30px;">▲</div>
+        <div class="card blue" onclick="selectPlane('balanced', '#00d4ff')">
+            <div style="color: #00d4ff; font-size: 30px;">▲</div>
             <h3>BALANCED</h3>
         </div>
         <div class="card red" onclick="selectPlane('speedster', '#ff4b2b')">
@@ -60,6 +66,7 @@
 </div>
 
 <canvas id="gameCanvas"></canvas>
+<div class="instruction">🎮 Geser jari / mouse untuk mengendalikan | Gambar musuh: enemy.jpg (ganti sesukamu)</div>
 
 <script>
 const canvas = document.getElementById("gameCanvas");
@@ -73,8 +80,7 @@ canvas.height = window.innerHeight;
 let score = 0;
 let gameActive = false;
 let selectedType = 'balanced';
-let playerColor = '#ffffff';
-let powerLevel = 1;
+let playerColor = '#00f2ff';
 
 // Input Posisi
 let targetX = canvas.width / 2;
@@ -88,20 +94,215 @@ function handleMove(e) {
     if(e.touches) {
         clientX = e.touches[0].clientX;
         clientY = e.touches[0].clientY;
+        e.preventDefault();
     } else {
         clientX = e.clientX;
         clientY = e.clientY;
     }
-    targetX = clientX;
-    targetY = clientY - 40; // Offset agar pesawat tidak tertutup jempol
+    let boundX = Math.min(Math.max(clientX, 30), canvas.width - 30);
+    let boundY = Math.min(Math.max(clientY - 40, 60), canvas.height - 60);
+    targetX = boundX;
+    targetY = boundY;
 }
 
 window.addEventListener("mousemove", handleMove);
-window.addEventListener("touchmove", (e) => {
-    e.preventDefault();
-    handleMove(e);
-}, { passive: false });
+window.addEventListener("touchmove", handleMove, { passive: false });
+window.addEventListener("touchstart", handleMove);
 
+// ======================= GAMBAR MUSUH (JPG EKSTERNAL) =======================
+// Ganti file "enemy.jpg" dengan gambar JPG pilihan Anda.
+// Pastikan file tersebut berada di folder yang sama dengan file HTML.
+let enemyImage = new Image();
+let enemyImageReady = false;
+let enemyLoadError = false;
+
+// Nama file gambar musuh - BISA DIUBAH SESUAI KESUKAAN ANDA
+const ENEMY_IMG_SRC = "enemy.jpg";   // <-- GANTI dengan path gambar JPG anda
+
+enemyImage.onload = () => {
+    console.log("Gambar musuh berhasil dimuat:", ENEMY_IMG_SRC);
+    enemyImageReady = true;
+};
+enemyImage.onerror = () => {
+    console.warn("Gagal memuat gambar:", ENEMY_IMG_SRC, " - menggunakan fallback shape.");
+    enemyLoadError = true;
+    enemyImageReady = false;
+};
+enemyImage.src = ENEMY_IMG_SRC;
+
+// ======================= GAME LOGIC =======================
+const bullets = [];
+const enemies = [];
+
+function spawnEnemy() {
+    if (!gameActive) return;
+    let size = 48; // ukuran musuh (sesuaikan dengan gambar Anda)
+    enemies.push({
+        x: Math.random() * (canvas.width - size),
+        y: -size,
+        w: size,
+        h: size,
+        speed: (selectedType === 'speedster' ? 5 : 3) + (score / 250),
+    });
+}
+setInterval(spawnEnemy, 800);
+
+// Tembakan otomatis
+setInterval(() => {
+    if (!gameActive) return;
+    let bSpeed = selectedType === 'speedster' ? -18 : -12;
+    
+    if (selectedType === 'balanced') {
+        bullets.push({ x: playerX, y: playerY - 20, vx: 0, vy: bSpeed, w: 4, h: 15 });
+    } else if (selectedType === 'speedster') {
+        bullets.push({ x: playerX, y: playerY - 20, vx: 0, vy: bSpeed, w: 4, h: 15 });
+    } else if (selectedType === 'tanker') {
+        bullets.push({ x: playerX - 10, y: playerY - 20, vx: -1, vy: bSpeed, w: 4, h: 15 });
+        bullets.push({ x: playerX + 10, y: playerY - 20, vx: 1, vy: bSpeed, w: 4, h: 15 });
+    }
+}, 150);
+
+function update() {
+    playerX += (targetX - playerX) * 0.15;
+    playerY += (targetY - playerY) * 0.15;
+    playerX = Math.min(Math.max(playerX, 25), canvas.width - 25);
+    playerY = Math.min(Math.max(playerY, 50), canvas.height - 50);
+    
+    // Update peluru
+    for (let i = 0; i < bullets.length; i++) {
+        bullets[i].x += bullets[i].vx;
+        bullets[i].y += bullets[i].vy;
+        if (bullets[i].y < 0 || bullets[i].y > canvas.height || bullets[i].x < 0 || bullets[i].x > canvas.width) {
+            bullets.splice(i, 1);
+            i--;
+        }
+    }
+    
+    // Update musuh & collision
+    for (let i = 0; i < enemies.length; i++) {
+        const en = enemies[i];
+        en.y += en.speed;
+        
+        // Collision dengan peluru
+        for (let j = 0; j < bullets.length; j++) {
+            const b = bullets[j];
+            if (b.x < en.x + en.w && b.x + b.w > en.x && b.y < en.y + en.h && b.y + b.h > en.y) {
+                enemies.splice(i, 1);
+                bullets.splice(j, 1);
+                score += 10;
+                scoreElement.innerText = score;
+                i--;
+                break;
+            }
+        }
+        
+        if (enemies[i] && enemies[i].y > canvas.height) {
+            enemies.splice(i, 1);
+            i--;
+        }
+    }
+    
+    // Collision player dengan musuh
+    for (let i = 0; i < enemies.length; i++) {
+        const en = enemies[i];
+        if (playerX + 20 > en.x && playerX - 20 < en.x + en.w &&
+            playerY + 20 > en.y && playerY - 20 < en.y + en.h) {
+            gameActive = false;
+            alert("💀 GAME OVER! Skor akhir: " + score);
+            location.reload();
+            return;
+        }
+    }
+}
+
+function draw() {
+    if (!gameActive) return;
+    
+    ctx.fillStyle = "#020205";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    // Efek bintang sederhana
+    ctx.fillStyle = "white";
+    for (let i = 0; i < 100; i++) {
+        let starX = (i * 131) % canvas.width;
+        let starY = (i * 253) % canvas.height;
+        ctx.fillRect(starX, starY, 1, 1);
+    }
+    
+    // Peluru
+    ctx.shadowBlur = 8;
+    ctx.shadowColor = "#0af";
+    bullets.forEach(b => {
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(b.x - 2, b.y, 4, 15);
+        ctx.fillStyle = "#00ffff";
+        ctx.fillRect(b.x - 1, b.y + 3, 2, 8);
+    });
+    
+    // MUSUH - Menggambar gambar JPG jika tersedia, jika tidak pakai kotak berwarna
+    enemies.forEach(en => {
+        if (enemyImageReady && enemyImage.complete && enemyImage.naturalWidth > 0) {
+            ctx.drawImage(enemyImage, en.x, en.y, en.w, en.h);
+        } else {
+            // Fallback jika gambar gagal dimuat: kotak merah dengan wajah
+            ctx.fillStyle = "#ff3366";
+            ctx.fillRect(en.x, en.y, en.w, en.h);
+            ctx.fillStyle = "white";
+            ctx.font = "bold 24px monospace";
+            ctx.fillText("👾", en.x + en.w/2 - 12, en.y + en.h/2 + 8);
+            ctx.fillStyle = "black";
+            ctx.fillRect(en.x + 10, en.y + 12, 6, 6);
+            ctx.fillRect(en.x + en.w - 16, en.y + 12, 6, 6);
+        }
+        // Outline merah (efek musuh)
+        ctx.strokeStyle = "#ff0000";
+        ctx.lineWidth = 2;
+        ctx.strokeRect(en.x, en.y, en.w, en.h);
+    });
+    
+    // Gambar PESAWAT PEMAIN
+    ctx.shadowBlur = 15;
+    ctx.shadowColor = playerColor;
+    ctx.fillStyle = playerColor;
+    ctx.beginPath();
+    if (selectedType === 'tanker') {
+        ctx.arc(playerX, playerY, 20, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "white";
+        ctx.font = "bold 16px Orbitron";
+        ctx.fillText("🛡️", playerX - 12, playerY + 8);
+    } else if (selectedType === 'speedster') {
+        ctx.moveTo(playerX, playerY - 25);
+        ctx.lineTo(playerX - 18, playerY + 12);
+        ctx.lineTo(playerX - 6, playerY + 5);
+        ctx.lineTo(playerX - 6, playerY + 18);
+        ctx.lineTo(playerX, playerY + 12);
+        ctx.lineTo(playerX + 6, playerY + 18);
+        ctx.lineTo(playerX + 6, playerY + 5);
+        ctx.lineTo(playerX + 18, playerY + 12);
+        ctx.fill();
+        ctx.fillStyle = "#ffaa44";
+        ctx.fillRect(playerX - 22, playerY - 5, 8, 8);
+        ctx.fillRect(playerX + 14, playerY - 5, 8, 8);
+    } else {
+        ctx.moveTo(playerX, playerY - 25);
+        ctx.lineTo(playerX - 20, playerY + 15);
+        ctx.lineTo(playerX - 8, playerY + 5);
+        ctx.lineTo(playerX - 8, playerY + 18);
+        ctx.lineTo(playerX, playerY + 12);
+        ctx.lineTo(playerX + 8, playerY + 18);
+        ctx.lineTo(playerX + 8, playerY + 5);
+        ctx.lineTo(playerX + 20, playerY + 15);
+        ctx.fill();
+    }
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    
+    update();
+    requestAnimationFrame(draw);
+}
+
+// ======================= MENU & START =======================
 function selectPlane(type, color) {
     selectedType = type;
     playerColor = color;
@@ -115,102 +316,24 @@ function startGame() {
     gameActive = true;
     score = 0;
     scoreElement.innerText = "0";
+    targetX = canvas.width / 2;
+    targetY = canvas.height - 100;
+    playerX = targetX;
+    playerY = targetY;
+    bullets.length = 0;
+    enemies.length = 0;
     requestAnimationFrame(draw);
 }
 
-const bullets = [];
-const enemies = [];
+window.addEventListener('resize', () => {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    targetX = Math.min(Math.max(targetX, 30), canvas.width - 30);
+    targetY = Math.min(Math.max(targetY, 60), canvas.height - 60);
+});
 
-function spawnEnemy() {
-    if (!gameActive) return;
-    enemies.push({
-        x: Math.random() * (canvas.width - 40),
-        y: -50, w: 40, h: 40,
-        speed: (selectedType === 'speedster' ? 5 : 3) + (score / 200),
-        color: `hsl(${Math.random() * 360}, 70%, 50%)`
-    });
-}
-setInterval(spawnEnemy, 800);
-
-// Logika Tembakan
-setInterval(() => {
-    if (!gameActive) return;
-    let bSpeed = selectedType === 'speedster' ? -18 : -12;
-    
-    if (selectedType === 'balanced') {
-        bullets.push({ x: playerX, y: playerY - 20, vx: 0, vy: bSpeed });
-    } else if (selectedType === 'speedster') {
-        bullets.push({ x: playerX, y: playerY - 20, vx: 0, vy: bSpeed });
-    } else if (selectedType === 'tanker') {
-        bullets.push({ x: playerX - 10, y: playerY - 20, vx: -1, vy: bSpeed });
-        bullets.push({ x: playerX + 10, y: playerY - 20, vx: 1, vy: bSpeed });
-    }
-}, 150);
-
-function update() {
-    playerX += (targetX - playerX) * 0.15;
-    playerY += (targetY - playerY) * 0.15;
-
-    bullets.forEach((b, i) => {
-        b.x += b.vx; b.y += b.vy;
-        if (b.y < 0) bullets.splice(i, 1);
-    });
-
-    enemies.forEach((en, i) => {
-        en.y += en.speed;
-        bullets.forEach((b, bi) => {
-            if (b.x > en.x && b.x < en.x + en.w && b.y > en.y && b.y < en.y + en.h) {
-                enemies.splice(i, 1);
-                bullets.splice(bi, 1);
-                score += 10;
-                scoreElement.innerText = score;
-            }
-        });
-        if (en.y > canvas.height) enemies.splice(i, 1);
-        let dist = Math.hypot(playerX - (en.x + en.w/2), playerY - (en.y + en.h/2));
-        if (dist < 25) {
-            gameActive = false;
-            alert("GAME OVER! Skor: " + score);
-            location.reload();
-        }
-    });
-}
-
-function draw() {
-    if (!gameActive) return;
-    ctx.fillStyle = "#020205";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    // Peluru
-    ctx.shadowBlur = 10; ctx.shadowColor = playerColor;
-    ctx.fillStyle = "white";
-    bullets.forEach(b => ctx.fillRect(b.x - 2, b.y, 4, 15));
-
-    // Musuh
-    enemies.forEach(en => {
-        ctx.shadowBlur = 15; ctx.shadowColor = en.color;
-        ctx.fillStyle = en.color;
-        ctx.fillRect(en.x, en.y, en.w, en.h);
-    });
-
-    // Pemain
-    ctx.shadowBlur = 20; ctx.shadowColor = playerColor;
-    ctx.fillStyle = playerColor;
-    ctx.beginPath();
-    if(selectedType === 'tanker') {
-       ctx.arc(playerX, playerY, 20, 0, Math.PI*2);
-   } else {
-        ctx.moveTo(playerX, playerY - 25);
-        ctx.lineTo(playerX - 20, playerY + 15);
-        ctx.lineTo(playerX + 20, playerY + 15);
-    }
-    ctx.fill();
-
-    update();
-    requestAnimationFrame(draw);
-
-    //ctx.drawImage(playerImg, playerX - 30, playerY - 30, 60, 60);
-}
+menu.style.display = 'flex';
+gameActive = false;
 </script>
 </body>
 </html>
