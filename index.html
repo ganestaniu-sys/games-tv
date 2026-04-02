@@ -29,7 +29,7 @@
         }
         .card:hover { border-color: #00f2ff; background: rgba(0, 242, 255, 0.1); }
         .card h3 { font-size: 12px; margin: 10px 0; }
-        .card.blue { border-color: #00d4ff; }
+        .card.blue { border-color: #ffffff; }
         .card.red { border-color: #ff4b2b; }
         .card.gold { border-color: #ffcc00; }
         
@@ -44,7 +44,7 @@
     <h1>PILIH PESAWAT</h1>
     <div class="plane-options">
         <div class="card blue" onclick="selectPlane('balanced', ,'#ffffff')">
-            <div style="color: #fffffff; font-size: 30px;">▲</div>
+            <div style="color: #ffffff; font-size: 30px;">▲</div>
             <h3>BALANCED</h3>
         </div>
         <div class="card red" onclick="selectPlane('speedster', '#ff4b2b')">
@@ -73,7 +73,7 @@ canvas.height = window.innerHeight;
 let score = 0;
 let gameActive = false;
 let selectedType = 'balanced';
-let playerColor = '#00f2ff';
+let playerColor = '#ffffff';
 let powerLevel = 1;
 
 // Input Posisi
