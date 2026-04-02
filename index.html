@@ -2,107 +2,83 @@
 <html lang="id">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Neon Striker PRO</title>
-
-<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Neon Striker PRO MAX</title>
 
 <style>
-body { margin:0; overflow:hidden; background:#020205; font-family:'Orbitron', sans-serif; touch-action:none;}
-canvas { display:block; }
-
-#ui{
- position:absolute; top:15px; left:15px; color:#00f2ff;
- font-size:18px; text-shadow:0 0 10px #00f2ff; z-index:20;
-}
+body { margin:0; overflow:hidden; background:black; font-family:Arial; }
+#ui { position:absolute; top:10px; left:10px; color:#0ff; }
+#hpwrap { width:150px; height:8px; background:#333; }
+#hp { height:100%; width:100%; background:#0f0; }
 
 #menu{
  position:absolute; width:100%; height:100%;
- background:rgba(2,2,5,0.95);
- display:flex; flex-direction:column; align-items:center; justify-content:center;
- z-index:10; color:white;
+ display:flex; justify-content:center; align-items:center;
+ background:black; color:white; flex-direction:column;
 }
-
-.card{
- background:rgba(255,255,255,0.05);
- border:2px solid #333; padding:20px; border-radius:15px;
- text-align:center; width:100px; cursor:pointer;
-}
-
-#btn-start{ display:none; margin-top:30px; padding:15px 40px; }
-
+button{ padding:15px 30px; font-size:18px; }
 </style>
 </head>
 
 <body>
 
-<div id="ui">
- SCORE: <span id="score">0</span><br>
- HIGH: <span id="highscore">0</span>
- <div style="width:150px;height:8px;background:#333;margin-top:5px;">
-  <div id="hpbar" style="height:100%;width:100%;background:#00ff88;"></div>
- </div>
-</div>
-
 <div id="menu">
- <h1>PILIH PESAWAT</h1>
-
- <div class="card" onclick="selectPlane('balanced','#00d4ff')">BALANCED</div>
- <div class="card" onclick="selectPlane('speed','#ff4b2b')">SPEED</div>
- <div class="card" onclick="selectPlane('power','#ffcc00')">POWER</div>
-
- <button id="btn-start" onclick="startGame()">START</button>
+<h1>NEON STRIKER PRO MAX</h1>
+<button onclick="startGame()">START</button>
 </div>
 
-<canvas id="gameCanvas"></canvas>
+<div id="ui">
+Score: <span id="score">0</span><br>
+High: <span id="high">0</span>
+<div id="hpwrap"><div id="hp"></div></div>
+</div>
+
+<canvas id="game"></canvas>
 
 <script>
-const canvas = document.getElementById("gameCanvas");
+const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
-
 canvas.width = innerWidth;
 canvas.height = innerHeight;
 
 // ===== DATA =====
 let score=0;
 let hp=100;
-let highScore = localStorage.getItem("neon_highscore") || 0;
-document.getElementById("highscore").innerText = highScore;
+let high = localStorage.getItem("hs") || 0;
+document.getElementById("high").innerText = high;
 
+let player={x:canvas.width/2, y:canvas.height-80};
+let bullets=[], enemies=[], boss=null;
 let gameActive=false;
-let playerX=canvas.width/2;
-let playerY=canvas.height-100;
-let targetX=playerX;
-let targetY=playerY;
-
-let bullets=[];
-let enemies=[];
-let boss=null;
 
 // ===== SOUND =====
-const shootSound=new Audio("https://actions.google.com/sounds/v1/alarms/beep_short.ogg");
-const hitSound=new Audio("https://actions.google.com/sounds/v1/explosions/explosion.ogg");
+const laser=new Audio("https://actions.google.com/sounds/v1/alarms/beep_short.ogg");
+const boom=new Audio("https://actions.google.com/sounds/v1/explosions/explosion.ogg");
 
 // unlock audio
-document.addEventListener("click", ()=>{
- shootSound.play().then(()=>shootSound.pause());
-}, {once:true});
+document.addEventListener("click",()=>{
+ laser.play().then(()=>laser.pause());
+},{once:true});
 
 // ===== CONTROL =====
-function handleMove(e){
- let x=e.touches?e.touches[0].clientX:e.clientX;
- let y=e.touches?e.touches[0].clientY:e.clientY;
- targetX=x; targetY=y;
-}
-window.addEventListener("mousemove",handleMove);
-window.addEventListener("touchmove",handleMove);
+window.addEventListener("mousemove",e=>{
+ player.x=e.clientX;
+ player.y=e.clientY;
+});
+window.addEventListener("touchmove",e=>{
+ player.x=e.touches[0].clientX;
+ player.y=e.touches[0].clientY;
+});
+
+// ===== BENDERA MUSUH =====
+const flags=["🇮🇩","🇺🇸","🇯🇵","🇰🇷","🇨🇳","🇧🇷","🇩🇪","🇫🇷","🇬🇧"];
 
 // ===== SHOOT =====
 setInterval(()=>{
  if(!gameActive) return;
- bullets.push({x:playerX,y:playerY-20});
- shootSound.currentTime=0;
- shootSound.play();
+ bullets.push({x:player.x,y:player.y});
+ laser.currentTime=0;
+ laser.play();
 },200);
 
 // ===== ENEMY =====
@@ -112,26 +88,29 @@ setInterval(()=>{
   x:Math.random()*canvas.width,
   y:-40,
   size:40,
+  flag: flags[Math.floor(Math.random()*flags.length)],
   speed:3
  });
 },800);
 
 // ===== BOSS =====
 function spawnBoss(){
- boss={x:canvas.width/2-50,y:50,w:100,h:100,hp:200};
+ boss={
+  x:canvas.width/2,
+  y:100,
+  hp:300,
+  flag:"🌍"
+ };
 }
 
 setInterval(()=>{
- if(score>0 && score%200===0 && !boss && gameActive){
+ if(score>0 && score%200==0 && !boss){
   spawnBoss();
  }
 },1000);
 
 // ===== UPDATE =====
 function update(){
-
- playerX += (targetX-playerX)*0.2;
- playerY += (targetY-playerY)*0.2;
 
  bullets.forEach((b,i)=>{
   b.y-=10;
@@ -142,33 +121,32 @@ function update(){
   e.y+=e.speed;
 
   bullets.forEach((b,j)=>{
-   if(b.x>e.x && b.x<e.x+e.size && b.y>e.y && b.y<e.y+e.size){
+   if(b.x>e.x && b.x<e.x+40 && b.y>e.y && b.y<e.y+40){
     enemies.splice(i,1);
     bullets.splice(j,1);
     score+=10;
-    hitSound.play();
+    boom.play();
    }
   });
 
   if(e.y>canvas.height){
    enemies.splice(i,1);
    hp-=10;
-   document.getElementById("hpbar").style.width=hp+"%";
   }
  });
 
- // boss hit
+ // boss
  if(boss){
   bullets.forEach((b,i)=>{
-   if(b.x>boss.x && b.x<boss.x+boss.w &&
-      b.y>boss.y && b.y<boss.y+boss.h){
+   if(b.x>boss.x-50 && b.x<boss.x+50 &&
+      b.y>boss.y-50 && b.y<boss.y+50){
     boss.hp-=5;
     bullets.splice(i,1);
    }
   });
 
   if(boss.hp<=0){
-   score+=100;
+   score+=200;
    boss=null;
   }
  }
@@ -182,43 +160,47 @@ function update(){
 function draw(){
  if(!gameActive) return;
 
- ctx.fillStyle="#020205";
+ ctx.fillStyle="black";
  ctx.fillRect(0,0,canvas.width,canvas.height);
 
- // player
+ // PLAYER PESAWAT
  ctx.fillStyle="#0ff";
  ctx.beginPath();
- ctx.moveTo(playerX,playerY-20);
- ctx.lineTo(playerX-15,playerY+15);
- ctx.lineTo(playerX+15,playerY+15);
+ ctx.moveTo(player.x,player.y-25);
+ ctx.lineTo(player.x-20,player.y+15);
+ ctx.lineTo(player.x-5,player.y+5);
+ ctx.lineTo(player.x+5,player.y+5);
+ ctx.lineTo(player.x+20,player.y+15);
  ctx.fill();
 
- // bullet
+ // BULLET
  ctx.fillStyle="white";
  bullets.forEach(b=>{
   ctx.fillRect(b.x,b.y,3,10);
  });
 
- // enemy
- ctx.fillStyle="red";
+ // ENEMY (BENDERA)
+ ctx.font="30px Arial";
  enemies.forEach(e=>{
-  ctx.fillRect(e.x,e.y,e.size,e.size);
+  ctx.fillText(e.flag,e.x,e.y);
  });
 
- // boss
+ // BOSS
  if(boss){
-  ctx.fillStyle="purple";
-  ctx.fillRect(boss.x,boss.y,boss.w,boss.h);
+  ctx.font="80px Arial";
+  ctx.fillText(boss.flag,boss.x-40,boss.y);
 
+  // HP boss
   ctx.fillStyle="red";
   ctx.fillRect(20,40,200,10);
   ctx.fillStyle="lime";
-  ctx.fillRect(20,40,boss.hp,10);
+  ctx.fillRect(20,40,boss.hp/1.5,10);
  }
 
  update();
 
  document.getElementById("score").innerText=score;
+ document.getElementById("hp").style.width=hp+"%";
 
  requestAnimationFrame(draw);
 }
@@ -227,19 +209,15 @@ function draw(){
 function gameOver(){
  gameActive=false;
 
- if(score>highScore){
-  localStorage.setItem("neon_highscore",score);
+ if(score>high){
+  localStorage.setItem("hs",score);
  }
 
  alert("GAME OVER\nScore: "+score);
  location.reload();
 }
 
-// ===== MENU =====
-function selectPlane(){
- document.getElementById("btn-start").style.display="block";
-}
-
+// ===== START =====
 function startGame(){
  document.getElementById("menu").style.display="none";
  gameActive=true;
